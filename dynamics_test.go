@@ -1,6 +1,7 @@
 package dynamics
 
 import (
+	"fmt"
 	"math"
 	"testing"
 )
@@ -109,6 +110,39 @@ func TestAnalyze(t *testing.T) {
 
 	if diff := math.Abs(zcr - expectedZCR); diff > toleranceZCR {
 		t.Errorf("Analyze ZCR returned %f, expected %f (difference: %f)", zcr, expectedZCR, diff)
+	}
+}
+
+func TestAnalyzeMultiChannel(t *testing.T) {
+	// Generate sample data
+	channel1 := GenerateSineWave(440, 1, 1, 2000)
+	channel2 := GenerateSineWave(150, 2, 1, 2000)
+	data := make([]MultiChannelSample, len(channel1))
+	for i := range channel1 {
+		data[i] = MultiChannelSample{
+			Time:  channel1[i].Time,
+			Value: []float64{channel1[i].Value, channel2[i].Value},
+		}
+	}
+
+	// Run the test
+	rms, zcr := AnalyzeMultiChannel(data)
+
+	fmt.Printf("len(rms): %d, len(zcr): %d\n", len(rms), len(zcr))
+
+	expectedRMS := []float64{0.7071, 1.4144}
+	expectedZCR := []float64{440.0, 150.0}
+	toleranceRMS := 0.0001
+	toleranceZCR := 1.0
+
+	for i := range rms {
+		if diff := math.Abs(rms[i] - expectedRMS[i]); diff > toleranceRMS {
+			t.Errorf("Analyze RMS returned %f, expected %f (difference: %f)", rms[i], expectedRMS[i], diff)
+		}
+
+		if diff := math.Abs(zcr[i] - expectedZCR[i]); diff > toleranceZCR {
+			t.Errorf("Analyze ZCR returned %f, expected %f (difference: %f)", zcr[i], expectedZCR[i], diff)
+		}
 	}
 }
 

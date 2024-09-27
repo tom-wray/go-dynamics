@@ -1,14 +1,19 @@
 package dynamics
 
 import (
+	"fmt"
 	"math"
 )
 
-// Sample represents a single sample of data with a time and value.
-type Sample struct {
+// Sample represents a single sample of data with a time and a generic value.
+type Sample[T float64 | []float64] struct {
 	Time  float64
-	Value float64
+	Value T
 }
+
+// Convenience type aliases for common use cases
+type SingleChannelSample = Sample[float64]
+type MultiChannelSample = Sample[[]float64]
 
 // Analyze calculates the Root Mean Square (RMS) and Negative Zero Crossing Rate (NZCR) of the given data.
 //
@@ -18,9 +23,39 @@ type Sample struct {
 // Returns:
 //   - rms: The calculated Root Mean Square value
 //   - zcr: The calculated Negative Zero Crossing Rate
-func Analyze(data []Sample) (rms float64, zcr float64) {
+func Analyze(data []SingleChannelSample) (rms float64, zcr float64) {
 	zcr = NegativeZeroCrossingRate(data)
 	rms = RMS(data, zcr)
+	return
+}
+
+// AnalyzeMultiChannel analyzes the given multi-channel data and returns the RMS and NZCR for each channel.
+//
+// Parameters:
+//   - data: A slice of MultiChannelSample structs containing time and value data
+//
+// Returns:
+//   - rms: A slice of float64 values representing the RMS for each channel
+//   - zcr: A slice of float64 values representing the NZCR for each channel
+func AnalyzeMultiChannel(data []MultiChannelSample) (rms []float64, zcr []float64) {
+	// channel count is the length of the value array
+	channelCount := len(data[0].Value)
+
+	zcr = make([]float64, channelCount)
+	rms = make([]float64, channelCount)
+
+	fmt.Printf("channelCount: %d\n", channelCount)
+
+	for i := range channelCount {
+		singleChannelData := make([]SingleChannelSample, len(data))
+		for j := range data {
+			singleChannelData[j] = SingleChannelSample{Time: data[j].Time, Value: data[j].Value[i]}
+		}
+		zcr[i] = NegativeZeroCrossingRate(singleChannelData)
+		rms[i] = RMS(singleChannelData, zcr[i])
+	}
+
+	fmt.Printf("Length of zcr: %d, length of rms: %d\n", len(zcr), len(rms))
 	return
 }
 
@@ -32,7 +67,7 @@ func Analyze(data []Sample) (rms float64, zcr float64) {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func RMS(data []Sample, frequency float64) float64 {
+func RMS(data []SingleChannelSample, frequency float64) float64 {
 	if len(data) == 0 {
 		return 0
 	}
@@ -66,7 +101,7 @@ func RMS(data []Sample, frequency float64) float64 {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func calculateRMS(data []Sample) float64 {
+func calculateRMS(data []SingleChannelSample) float64 {
 	if len(data) == 0 {
 		return 0
 	}
@@ -81,7 +116,7 @@ func calculateRMS(data []Sample) float64 {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func calculateRMSAverage(data []Sample) float64 {
+func calculateRMSAverage(data []SingleChannelSample) float64 {
 	sum := 0.0
 	for _, value := range data {
 		sum += value.Value * value.Value
@@ -97,7 +132,7 @@ func calculateRMSAverage(data []Sample) float64 {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func calculateRMSPeak(data []Sample) float64 {
+func calculateRMSPeak(data []SingleChannelSample) float64 {
 	peak := 0.0
 	for _, value := range data {
 		absValue := math.Abs(value.Value)
@@ -115,7 +150,7 @@ func calculateRMSPeak(data []Sample) float64 {
 //
 // Returns:
 //   - float64: The calculated Zero Crossing Rate
-func ZeroCrossingRate(data []Sample) float64 {
+func ZeroCrossingRate(data []SingleChannelSample) float64 {
 	if len(data) == 0 {
 		return 0
 	}
@@ -138,7 +173,7 @@ func ZeroCrossingRate(data []Sample) float64 {
 //
 // Returns:
 //   - float64: The calculated Negative Zero Crossing Rate
-func NegativeZeroCrossingRate(data []Sample) float64 {
+func NegativeZeroCrossingRate(data []SingleChannelSample) float64 {
 	if len(data) == 0 {
 		return 0
 	}
@@ -165,18 +200,18 @@ func NegativeZeroCrossingRate(data []Sample) float64 {
 //
 // Returns:
 //   - []Sample: A slice of Sample structs representing the generated sine wave
-func GenerateSineWave(frequency, amplitude, duration float64, sampleRate int) []Sample {
+func GenerateSineWave(frequency, amplitude, duration float64, sampleRate int) []SingleChannelSample {
 	samples := int(duration * float64(sampleRate))
-	data := make([]Sample, samples)
+	data := make([]SingleChannelSample, samples)
 
 	// Constants
 	angularFrequency := 2 * math.Pi * frequency
 	timeStep := 1.0 / float64(sampleRate)
 
 	// Initialize first two samples
-	data[0] = Sample{Time: 0, Value: 0}
+	data[0] = SingleChannelSample{Time: 0, Value: 0}
 	if samples > 1 {
-		data[1] = Sample{Time: timeStep, Value: amplitude * math.Sin(angularFrequency*timeStep)}
+		data[1] = SingleChannelSample{Time: timeStep, Value: amplitude * math.Sin(angularFrequency*timeStep)}
 	}
 
 	// Recurrence coefficients
@@ -187,7 +222,7 @@ func GenerateSineWave(frequency, amplitude, duration float64, sampleRate int) []
 		t := float64(i) * timeStep
 		// Recurrence relation: y[n] = c * y[n-1] - y[n-2]
 		value := c*data[i-1].Value - data[i-2].Value
-		data[i] = Sample{Time: t, Value: value}
+		data[i] = SingleChannelSample{Time: t, Value: value}
 	}
 
 	return data
@@ -201,7 +236,7 @@ func GenerateSineWave(frequency, amplitude, duration float64, sampleRate int) []
 //
 // Returns:
 //   - []Sample: A slice of Sample structs containing the last X seconds of data
-func KeepXSecondsOfData(fastDataArray []Sample, seconds float64) []Sample {
+func KeepXSecondsOfData(fastDataArray []SingleChannelSample, seconds float64) []SingleChannelSample {
 	if len(fastDataArray) == 0 {
 		return fastDataArray
 	}
@@ -217,5 +252,5 @@ func KeepXSecondsOfData(fastDataArray []Sample, seconds float64) []Sample {
 	}
 
 	// if the cutoff is not found, return an empty array
-	return []Sample{}
+	return []SingleChannelSample{}
 }
