@@ -7,8 +7,8 @@ import (
 
 // Sample represents a single sample of data with a time and a generic value.
 type Sample[T float64 | []float64] struct {
-	Time  float64
-	Value T
+	Time  float64 `json:"time"`
+	Value T       `json:"value"`
 }
 
 // Convenience type aliases for common use cases
