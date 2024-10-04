@@ -5,6 +5,52 @@ import (
 	"math"
 )
 
+// CircularBuffer represents a circular buffer for storing SingleChannelSample data.
+type CircularBuffer struct {
+	data  []SingleChannelSample
+	size  int
+	head  int
+	count int
+}
+
+// NewCircularBuffer creates a new CircularBuffer with the specified size.
+func NewCircularBuffer(size int) *CircularBuffer {
+	return &CircularBuffer{
+		data:  make([]SingleChannelSample, size),
+		size:  size,
+		head:  0,
+		count: 0,
+	}
+}
+
+// Update adds a new sample to the circular buffer.
+func (cb *CircularBuffer) Update(sample SingleChannelSample) {
+	cb.data[cb.head] = sample
+	cb.head = (cb.head + 1) % cb.size
+	if cb.count < cb.size {
+		cb.count++
+	}
+}
+
+// GetData returns a slice of the data in the buffer, from oldest to newest.
+func (cb *CircularBuffer) GetData() []SingleChannelSample {
+	result := make([]SingleChannelSample, cb.count)
+	for i := 0; i < cb.count; i++ {
+		index := (cb.head - cb.count + i + cb.size) % cb.size
+		result[i] = cb.data[index]
+	}
+	return result
+}
+
+// AnalyzeBuffer calculates the RMS and NZCR of the data stored in the circular buffer.
+func (cb *CircularBuffer) AnalyzeBuffer() (rms float64, zcr float64) {
+	if cb.count == 0 {
+		return 0, 0
+	}
+	data := cb.GetData()
+	return Analyze(data)
+}
+
 // Sample represents a single sample of data with a time and a generic value.
 type Sample[T float64 | []float64] struct {
 	Time  float64 `json:"time"`
