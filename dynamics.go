@@ -5,6 +5,16 @@ import (
 	"math"
 )
 
+// Sample represents a single sample of data with a time and a generic value.
+type Sample[T float64 | []float64] struct {
+	Time  float64 `json:"time"`
+	Value T       `json:"value"`
+}
+
+// Convenience type aliases for common use cases
+type SingleChannelSample = Sample[float64]
+type MultiChannelSample = Sample[[]float64]
+
 // CircularBuffer represents a circular buffer for storing SingleChannelSample data.
 type CircularBuffer struct {
 	data  []SingleChannelSample
@@ -47,19 +57,46 @@ func (cb *CircularBuffer) AnalyzeBuffer() (rms float64, zcr float64) {
 	if cb.count == 0 {
 		return 0, 0
 	}
-	data := cb.GetData()
-	return Analyze(data)
+	zcr = cb.GetBufferNZCR()
+	rms = cb.GetBufferRMS()
+	return
 }
 
-// Sample represents a single sample of data with a time and a generic value.
-type Sample[T float64 | []float64] struct {
-	Time  float64 `json:"time"`
-	Value T       `json:"value"`
+// GetBufferRMS returns the RMS of the data stored in the circular buffer.
+func (cb *CircularBuffer) GetBufferRMS() float64 {
+	if cb.count == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for i := 0; i < cb.count; i++ {
+		index := (cb.head - cb.count + i + cb.size) % cb.size
+		value := cb.data[index].Value
+		sum += value * value
+	}
+	mean := sum / float64(cb.count)
+	return math.Sqrt(mean)
 }
 
-// Convenience type aliases for common use cases
-type SingleChannelSample = Sample[float64]
-type MultiChannelSample = Sample[[]float64]
+// GetBufferNZCR returns the NZCR of the data stored in the circular buffer.
+func (cb *CircularBuffer) GetBufferNZCR() float64 {
+	if cb.count < 2 {
+		return 0
+	}
+
+	crossings := 0
+	prevIndex := (cb.head - cb.count + cb.size) % cb.size
+	for i := 1; i < cb.count; i++ {
+		currIndex := (prevIndex + 1) % cb.size
+		if cb.data[prevIndex].Value >= 0 && cb.data[currIndex].Value < 0 {
+			crossings++
+		}
+		prevIndex = currIndex
+	}
+
+	duration := cb.data[(cb.head-1+cb.size)%cb.size].Time - cb.data[(cb.head-cb.count+cb.size)%cb.size].Time
+	return float64(crossings) / duration
+}
 
 // Analyze calculates the Root Mean Square (RMS) and Negative Zero Crossing Rate (NZCR) of the given data.
 //
