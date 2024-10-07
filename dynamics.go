@@ -215,16 +215,16 @@ func calculateRMSAverage(data []SingleChannelSample) float64 {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func calculateRMSPeak(data []SingleChannelSample) float64 {
-	peak := 0.0
-	for _, value := range data {
-		absValue := math.Abs(value.Value)
-		if absValue > peak {
-			peak = absValue
-		}
-	}
-	return peak / math.Sqrt(2)
-}
+// func calculateRMSPeak(data []SingleChannelSample) float64 {
+// 	peak := 0.0
+// 	for _, value := range data {
+// 		absValue := math.Abs(value.Value)
+// 		if absValue > peak {
+// 			peak = absValue
+// 		}
+// 	}
+// 	return peak / math.Sqrt(2)
+// }
 
 // ZeroCrossingRate calculates the Zero Crossing Rate of the given data.
 //
