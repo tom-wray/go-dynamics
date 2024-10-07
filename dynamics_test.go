@@ -198,3 +198,39 @@ func BenchmarkAnalyze(b *testing.B) {
 		Analyze(data)
 	}
 }
+
+// a function that has a ticker every 1ms and adds a sample to the circular buffer, then every 100ms it prints the RMS and NZCR of the buffer
+func BenchmarkCircularBuffer(b *testing.B) {
+	sineWave := GenerateSineWave(440, 1, 1, 1000)
+	// Create a new CircularBuffer with a size of 1000
+	cb := NewCircularBuffer(1000)
+
+	// Run the benchmark
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		cb.Update(SingleChannelSample{Time: float64(i), Value: sineWave[i%len(sineWave)].Value})
+		if i%100 == 0 {
+			rms, zcr := cb.AnalyzeBuffer()
+			fmt.Printf("Length: %d, RMS: %f, NZCR: %f\n", cb.count, rms, zcr)
+		}
+	}
+}
+
+func BenchmarkSlice(b *testing.B) {
+	sineWave := GenerateSineWave(440, 1, 1, 1000)
+	data := []SingleChannelSample{}
+
+	// Run the benchmark
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		data = append(data, SingleChannelSample{Time: float64(i), Value: sineWave[i%len(sineWave)].Value})
+		if i%100 == 0 {
+			if len(data) > 1000 {
+				// Keep only the last 1000 samples
+				data = data[len(data)-1000:]
+			}
+			rms, zcr := Analyze(data)
+			fmt.Printf("Length: %d, RMS: %f, NZCR: %f\n", len(data), rms, zcr)
+		}
+	}
+}

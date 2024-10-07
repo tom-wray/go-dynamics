@@ -15,6 +15,89 @@ type Sample[T float64 | []float64] struct {
 type SingleChannelSample = Sample[float64]
 type MultiChannelSample = Sample[[]float64]
 
+// CircularBuffer represents a circular buffer for storing SingleChannelSample data.
+type CircularBuffer struct {
+	data  []SingleChannelSample
+	size  int
+	head  int
+	count int
+}
+
+// NewCircularBuffer creates a new CircularBuffer with the specified size.
+func NewCircularBuffer(size int) *CircularBuffer {
+	return &CircularBuffer{
+		data:  make([]SingleChannelSample, size),
+		size:  size,
+		head:  0,
+		count: 0,
+	}
+}
+
+// Update adds a new sample to the circular buffer.
+func (cb *CircularBuffer) Update(sample SingleChannelSample) {
+	cb.data[cb.head] = sample
+	cb.head = (cb.head + 1) % cb.size
+	if cb.count < cb.size {
+		cb.count++
+	}
+}
+
+// GetData returns a slice of the data in the buffer, from oldest to newest.
+func (cb *CircularBuffer) GetData() []SingleChannelSample {
+	result := make([]SingleChannelSample, cb.count)
+	for i := 0; i < cb.count; i++ {
+		index := (cb.head - cb.count + i + cb.size) % cb.size
+		result[i] = cb.data[index]
+	}
+	return result
+}
+
+// AnalyzeBuffer calculates the RMS and NZCR of the data stored in the circular buffer.
+func (cb *CircularBuffer) AnalyzeBuffer() (rms float64, zcr float64) {
+	if cb.count == 0 {
+		return 0, 0
+	}
+	zcr = cb.GetBufferNZCR()
+	rms = cb.GetBufferRMS()
+	return
+}
+
+// GetBufferRMS returns the RMS of the data stored in the circular buffer.
+func (cb *CircularBuffer) GetBufferRMS() float64 {
+	if cb.count == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for i := 0; i < cb.count; i++ {
+		index := (cb.head - cb.count + i + cb.size) % cb.size
+		value := cb.data[index].Value
+		sum += value * value
+	}
+	mean := sum / float64(cb.count)
+	return math.Sqrt(mean)
+}
+
+// GetBufferNZCR returns the NZCR of the data stored in the circular buffer.
+func (cb *CircularBuffer) GetBufferNZCR() float64 {
+	if cb.count < 2 {
+		return 0
+	}
+
+	crossings := 0
+	prevIndex := (cb.head - cb.count + cb.size) % cb.size
+	for i := 1; i < cb.count; i++ {
+		currIndex := (prevIndex + 1) % cb.size
+		if cb.data[prevIndex].Value >= 0 && cb.data[currIndex].Value < 0 {
+			crossings++
+		}
+		prevIndex = currIndex
+	}
+
+	duration := cb.data[(cb.head-1+cb.size)%cb.size].Time - cb.data[(cb.head-cb.count+cb.size)%cb.size].Time
+	return float64(crossings) / duration
+}
+
 // Analyze calculates the Root Mean Square (RMS) and Negative Zero Crossing Rate (NZCR) of the given data.
 //
 // Parameters:
@@ -132,16 +215,16 @@ func calculateRMSAverage(data []SingleChannelSample) float64 {
 //
 // Returns:
 //   - float64: The calculated Root Mean Square value
-func calculateRMSPeak(data []SingleChannelSample) float64 {
-	peak := 0.0
-	for _, value := range data {
-		absValue := math.Abs(value.Value)
-		if absValue > peak {
-			peak = absValue
-		}
-	}
-	return peak / math.Sqrt(2)
-}
+// func calculateRMSPeak(data []SingleChannelSample) float64 {
+// 	peak := 0.0
+// 	for _, value := range data {
+// 		absValue := math.Abs(value.Value)
+// 		if absValue > peak {
+// 			peak = absValue
+// 		}
+// 	}
+// 	return peak / math.Sqrt(2)
+// }
 
 // ZeroCrossingRate calculates the Zero Crossing Rate of the given data.
 //
